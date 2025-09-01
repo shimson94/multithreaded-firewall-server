@@ -1,0 +1,10 @@
+# Compiled binaries
+server
+client
+*.o
+
+# Test logs (ignore all except actual test results)
+*.log
+
+# Temporary files
+*.tmp

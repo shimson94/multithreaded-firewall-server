@@ -1,0 +1,20 @@
+Stress Test Results - Maximum Concurrency
+=========================================
+Timestamp: Tue Sep  2 00:27:12 BST 2025
+
+Level 50: 50/50 successful (100.0%) in .139351940s at 358.80 ops/sec
+Level 100: 100/100 successful (100.0%) in .268494481s at 372.44 ops/sec
+Level 250: 250/250 successful (100.0%) in .656125132s at 381.02 ops/sec
+Level 500: 500/500 successful (100.0%) in 1.307658807s at 382.36 ops/sec
+Level 750: 750/750 successful (100.0%) in 1.977317842s at 379.30 ops/sec
+Level 1000: 1000/1000 successful (100.0%) in 2.688025303s at 372.02 ops/sec
+Level 2000: 2000/2000 successful (100.0%) in 5.772008318s at 346.49 ops/sec
+Level 3000: 3000/3000 successful (100.0%) in 9.255807923s at 324.12 ops/sec
+Level 5000: 5000/5000 successful (100.0%) in 17.520553303s at 285.37 ops/sec
+Level 10000: 10000/10000 successful (100.0%) in 46.287032469s at 216.04 ops/sec
+
+SUMMARY:
+Maximum tested concurrency: 10000 concurrent connections
+Best success rate achieved: 100.0%
+Peak throughput: 382.36 ops/sec
+Test levels: 50 100 250 500 750 1000 2000 3000 5000 10000

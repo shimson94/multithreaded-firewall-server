@@ -1,0 +1,13 @@
+Concurrency Test Results
+========================
+Timestamp: Mon Sep  1 17:52:38 BST 2025
+
+Sequential Test: 50/50 successful in .248678751s
+Low Concurrency (25): 25/25 successful in .006948872s
+Medium Concurrency (100): 100/100 successful in .012938647s
+High Concurrency (250): 250/250 successful in .032618939s
+Mixed Operations: Add(100/100), Check(100/100), List(25/25) in .036309873s
+Final rule count: 47
+
+SUMMARY:
+Overall Success Rate: 525/525 (100.0%)
