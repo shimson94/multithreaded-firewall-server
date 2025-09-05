@@ -30,22 +30,7 @@ echo "=========================================" >> "$STRESS_RESULTS"
 echo "Timestamp: $(date)" >> "$STRESS_RESULTS"
 echo "" >> "$STRESS_RESULTS"
 
-# OLD: Deterministic IP and port allocation (ARTIFICIAL - COMMENTING OUT)
-# generate_valid_ip_port() {
-#     local index=$1
-#     
-#     # Generate unique IPs within private address space
-#     local subnet=$((index % 250 + 1))
-#     local host=$(((index / 250) % 250 + 1))
-#     local ip="192.168.$subnet.$host"
-#     
-#     # Generate unique ports: 10000-65000 range to avoid conflicts
-#     local port=$((10000 + index))
-#     
-#     echo "$ip $port"
-# }
-
-# NEW: Realistic IP and port generation with conflicts and edge cases
+# Realistic IP and port generation with conflicts and edge cases
 generate_realistic_ip_port() {
     local index=$1
     local scenario=$((index % 10))
@@ -202,19 +187,10 @@ test_stress_level() {
     client_pids=()
     local start_time=$(date +%s.%N)
     
-    # Initialise per-client validation log
-    local validation_log="validation_${level}.log"
-    echo "# Individual Client Validation Log - Level $level" > "$validation_log"
-    echo "# Format: ClientID | Input | Expected | Actual | Validation" >> "$validation_log"
-    
     for i in $(seq 1 $level); do
         local ip_port=$(generate_realistic_ip_port $i)
         local ip=$(echo $ip_port | cut -d' ' -f1)
         local port=$(echo $ip_port | cut -d' ' -f2)
-        local expected=$(predict_expected_outcome "$ip" "$port" "$i")
-        
-        # Record input parameters and prediction
-        echo "$i | $ip:$port | $expected | PENDING | PENDING" >> "$validation_log"
         
         timeout 30s "$PROJECT_ROOT/client" localhost 2302 A "$ip" $port > "stress_${level}_$i.tmp" 2>&1 &
         client_pids+=($!)
@@ -230,12 +206,18 @@ test_stress_level() {
     local end_time=$(date +%s.%N)
     local duration=$(echo "$end_time - $start_time" | bc -l)
     
-    # Validate each client response individually
+    # Validate each client response individually using deterministic input regeneration
     echo "Performing individual input-output validation..."
     
     local correct_validations=0
     local total_validations=0
     local validation_failures=()
+    local validation_log="validation_${level}.log"
+    local validation_entries=()
+    
+    # Build validation log header
+    validation_entries+=("# Individual Client Validation Log - Level $level")
+    validation_entries+=("# Format: ClientID | Input | Expected | Actual | Validation")
     
     for i in $(seq 1 $level); do
         local ip_port=$(generate_realistic_ip_port $i)
@@ -244,19 +226,19 @@ test_stress_level() {
         local expected=$(predict_expected_outcome "$ip" "$port" "$i")
         local client_file="stress_${level}_$i.tmp"
         
-        local validation_result=$(validate_client_result "$client_file" "$expected" "$ip" "$port")
-        local validation_status=$?
-        
-        # Update log with server response
+        # Collect actual server response efficiently
         local actual_response=""
         if [[ -f "$client_file" ]]; then
-            actual_response=$(cat "$client_file" | tr '\n' ' ')
+            actual_response=$(tr '\n' ' ' < "$client_file")
         else
             actual_response="NO_RESPONSE_FILE"
         fi
         
-        # Update validation status in log file
-        sed -i "${i}s/| PENDING | PENDING$/| $actual_response | $validation_result/" "$validation_log"
+        local validation_result=$(validate_client_result "$client_file" "$expected" "$ip" "$port")
+        local validation_status=$?
+        
+        # Build validation log entry in memory
+        validation_entries+=("$i | $ip:$port | $expected | $actual_response | $validation_result")
         
         total_validations=$((total_validations + 1))
         if [[ $validation_status -eq 0 ]]; then
@@ -265,6 +247,9 @@ test_stress_level() {
             validation_failures+=("Client $i ($ip:$port): $validation_result")
         fi
     done
+    
+    # Write complete validation log in single operation
+    printf '%s\n' "${validation_entries[@]}" > "$validation_log"
     
     # Calculate individual validation success rate
     local real_correctness_rate=$(echo "scale=1; $correct_validations * 100 / $total_validations" | bc -l)
@@ -277,56 +262,20 @@ test_stress_level() {
     local empty_responses=$(find . -name "stress_${level}_*.tmp" -size 0 2>/dev/null | wc -l)
     local total_files=$(ls stress_${level}_*.tmp 2>/dev/null | wc -l)
     
-    echo "Test Results:"
-    echo "   Client processes: $level"
-    echo "   Response files: $total_files"  
-    echo "   Successful: $successful"
-    echo "   Already exists: $already_exists"
-    echo "   Invalid: $invalid"
-    echo "   Connection failed: $connection_failed"
-    echo "   Empty responses: $empty_responses"
-    echo "   Duration: ${duration}s"
-    echo "   Rate: $(echo "scale=2; $level / $duration" | bc -l) ops/sec"
-    
-    if [ $invalid -gt 0 ]; then
-        echo -e "\nInvalid responses (sample):"
-        grep -l "Invalid rule" stress_${level}_*.tmp | head -2 | while read f; do
-            local idx=$(echo $f | grep -o '[0-9]*' | tail -1)
-            local test_ip_port=$(generate_realistic_ip_port $idx)
-            echo "$f: $(cat "$f") [Generated: $test_ip_port]"
-        done
-    fi
-    
-    if [ $connection_failed -gt 0 ]; then
-        echo -e "\nConnection failures (sample):"
-        grep -l "Connection refused\|Connection reset\|Connection timed out" stress_${level}_*.tmp | head -3 | while read f; do
-            echo "$f: $(cat "$f")"
-        done
-    fi
-    
-    if [ $empty_responses -gt 0 ]; then
-        echo -e "\nEmpty response files: $empty_responses (possible client crashes or connection failures)"
-    fi
-    
-    # Calculate correctness rate: all appropriate responses (success + conflicts + proper rejections)
-    local correct_responses=$((successful + already_exists + invalid))
+    # Calculate metrics
     local actual_errors=$((connection_failed + empty_responses))
-    local correctness_rate=$(echo "scale=1; $correct_responses * 100 / $total_files" | bc -l)
     local throughput=$(echo "scale=2; $level / $duration" | bc -l 2>/dev/null || echo "0")
     
-    echo ""
-    echo "   INDIVIDUAL VALIDATION RESULTS:"
-    echo "     Correct validations: $correct_validations/$total_validations"
-    echo "     Validation failures: ${#validation_failures[@]}"
-    echo "     CORRECTNESS RATE: ${real_correctness_rate}% (each input gets expected response)"
-    echo "     THROUGHPUT: ${throughput} ops/sec"
-    echo ""
-    echo "   LEGACY AGGREGATE BREAKDOWN (for comparison):"
-    echo "     New rules added: $successful"
-    echo "     Conflicts detected: $already_exists" 
-    echo "     Invalid inputs rejected: $invalid"
-    echo "     Connection/system errors: $actual_errors"
-    echo "     Legacy aggregate rate: ${correctness_rate}% (meaningless - just counts any response)"
+    echo "Test Results:"
+    echo "   Duration: ${duration}s"
+    echo "   Throughput: ${throughput} ops/sec"
+    echo "   Validated correctly: $correct_validations/$total_validations (${real_correctness_rate}%)"
+    echo "   Response breakdown: $successful new, $already_exists conflicts, $invalid rejected"
+    
+    # Only show system errors if they exist
+    if [[ $actual_errors -gt 0 ]]; then
+        echo "   System errors: $connection_failed connection failures, $empty_responses empty responses"
+    fi
     
     # Report validation failures
     if [[ ${#validation_failures[@]} -gt 0 ]]; then
@@ -346,7 +295,6 @@ test_stress_level() {
     fi
     
     echo ""
-    echo "   Detailed validation log: $validation_log"
     
     # Store metrics for summary report
     SUCCESS_RATES+=($real_correctness_rate)

@@ -1,26 +1,26 @@
 Stress Test Results - Maximum Concurrency
 =========================================
-Timestamp: Fri Sep  5 09:29:03 BST 2025
+Timestamp: Fri Sep  5 10:44:28 BST 2025
 
-Level 50: Correctness 100.0% (50/50 validated correctly) in .221154101s at 226.08 ops/sec
+Level 50: Correctness 100.0% (50/50 validated correctly) in .138866698s at 360.05 ops/sec
   Legacy breakdown: 17 new, 23 conflicts, 10 rejected, 0 errors
-Level 100: Correctness 100.0% (100/100 validated correctly) in .437488437s at 228.57 ops/sec
+Level 100: Correctness 100.0% (100/100 validated correctly) in .261545713s at 382.34 ops/sec
   Legacy breakdown: 27 new, 53 conflicts, 20 rejected, 0 errors
-Level 250: Correctness 100.0% (250/250 validated correctly) in 1.042924022s at 239.71 ops/sec
+Level 250: Correctness 100.0% (250/250 validated correctly) in .629223306s at 397.31 ops/sec
   Legacy breakdown: 57 new, 143 conflicts, 50 rejected, 0 errors
-Level 500: Correctness 100.0% (500/500 validated correctly) in 2.099161535s at 238.19 ops/sec
+Level 500: Correctness 100.0% (500/500 validated correctly) in 1.310350586s at 381.57 ops/sec
   Legacy breakdown: 107 new, 293 conflicts, 100 rejected, 0 errors
-Level 750: Correctness 100.0% (750/750 validated correctly) in 3.211159733s at 233.56 ops/sec
+Level 750: Correctness 100.0% (750/750 validated correctly) in 2.027302298s at 369.94 ops/sec
   Legacy breakdown: 157 new, 443 conflicts, 150 rejected, 0 errors
-Level 1000: Correctness 100.0% (1000/1000 validated correctly) in 4.385844657s at 228.00 ops/sec
+Level 1000: Correctness 100.0% (1000/1000 validated correctly) in 2.776143934s at 360.21 ops/sec
   Legacy breakdown: 207 new, 593 conflicts, 200 rejected, 0 errors
-Level 2000: Correctness 100.0% (2000/2000 validated correctly) in 9.357749479s at 213.72 ops/sec
+Level 2000: Correctness 100.0% (2000/2000 validated correctly) in 5.889722078s at 339.57 ops/sec
   Legacy breakdown: 407 new, 1193 conflicts, 400 rejected, 0 errors
-Level 3000: Correctness 100.0% (3000/3000 validated correctly) in 14.882360177s at 201.58 ops/sec
+Level 3000: Correctness 100.0% (3000/3000 validated correctly) in 9.597195116s at 312.59 ops/sec
   Legacy breakdown: 607 new, 1793 conflicts, 600 rejected, 0 errors
-Level 5000: Correctness 100.0% (5000/5000 validated correctly) in 27.483791044s at 181.92 ops/sec
+Level 5000: Correctness 100.0% (5000/5000 validated correctly) in 18.083566208s at 276.49 ops/sec
   Legacy breakdown: 1007 new, 2993 conflicts, 1000 rejected, 0 errors
-Level 10000: Correctness 100.0% (10000/10000 validated correctly) in 71.101541519s at 140.64 ops/sec
+Level 10000: Correctness 100.0% (10000/10000 validated correctly) in 48.655692812s at 205.52 ops/sec
   Legacy breakdown: 2007 new, 5993 conflicts, 2000 rejected, 0 errors
 
 SUMMARY:
@@ -28,7 +28,7 @@ SUMMARY:
 FINAL SUMMARY:
 Maximum tested concurrency: 10000 concurrent connections
 Server correctness rate: 100.0% (individual input-output validation)
-Peak throughput: 239.71 ops/sec
+Peak throughput: 397.31 ops/sec
 Test methodology: Individual validation of each input against expected outcome
 Input distribution: 50% conflicts, 20% unique, 10% edge cases, 10% invalid IPs, 10% invalid ports
 Test levels: 50 100 250 500 750 1000 2000 3000 5000 10000
