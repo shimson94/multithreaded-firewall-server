@@ -138,13 +138,39 @@ bool is_valid_ip_range(const char *ip_range) {
     sscanf(ip_range, "%63[^-]-%63s", ip_start, ip_end);
     return is_valid_ip(ip_start) && is_valid_ip(ip_end);
 }
+bool is_valid_numeric_port(const char *port_str) {
+    if (port_str == NULL || *port_str == '\0') return false;
+    
+    // Check if all characters are digits
+    for (int i = 0; port_str[i] != '\0'; i++) {
+        if (!isdigit(port_str[i])) {
+            return false;
+        }
+    }
+    
+    // Convert and validate range
+    int port = atoi(port_str);
+    return port >= 0 && port <= 65535;
+}
+
 bool is_valid_port_range(const char *port_range) {
     int start, end;
     if (strchr(port_range, '-') == NULL) {
-        int port = atoi(port_range);
-        return port >= 0 && port <= 65535;
+        return is_valid_numeric_port(port_range);
     }
-    sscanf(port_range, "%d-%d", &start, &end);
+    
+    // For range format "start-end"
+    char start_str[16], end_str[16];
+    if (sscanf(port_range, "%15[^-]-%15s", start_str, end_str) != 2) {
+        return false;
+    }
+    
+    if (!is_valid_numeric_port(start_str) || !is_valid_numeric_port(end_str)) {
+        return false;
+    }
+    
+    start = atoi(start_str);
+    end = atoi(end_str);
     return start >= 0 && end <= 65535 && start < end;
 }
 bool ip_to_integer(const char *ip, unsigned int *result) {

@@ -1,20 +1,76 @@
 Stress Test Results - Maximum Concurrency
 =========================================
-Timestamp: Tue Sep  2 00:27:12 BST 2025
+Timestamp: Fri Sep  5 15:51:34 BST 2025
 
-Level 50: 50/50 successful (100.0%) in .139351940s at 358.80 ops/sec
-Level 100: 100/100 successful (100.0%) in .268494481s at 372.44 ops/sec
-Level 250: 250/250 successful (100.0%) in .656125132s at 381.02 ops/sec
-Level 500: 500/500 successful (100.0%) in 1.307658807s at 382.36 ops/sec
-Level 750: 750/750 successful (100.0%) in 1.977317842s at 379.30 ops/sec
-Level 1000: 1000/1000 successful (100.0%) in 2.688025303s at 372.02 ops/sec
-Level 2000: 2000/2000 successful (100.0%) in 5.772008318s at 346.49 ops/sec
-Level 3000: 3000/3000 successful (100.0%) in 9.255807923s at 324.12 ops/sec
-Level 5000: 5000/5000 successful (100.0%) in 17.520553303s at 285.37 ops/sec
-Level 10000: 10000/10000 successful (100.0%) in 46.287032469s at 216.04 ops/sec
+Level 50: Correctness 100.0% (50/50 validated correctly)
+  Client-server time: .145644300s at 343.30 ops/sec
+  Validation processing: .424873330s
+  System overhead: .539081714s
+  Response breakdown: 17 new, 23 conflicts, 10 rejected, 0 errors
+
+Level 100: Correctness 100.0% (100/100 validated correctly)
+  Client-server time: .263769746s at 379.11 ops/sec
+  Validation processing: .876375960s
+  System overhead: .936243692s
+  Response breakdown: 27 new, 53 conflicts, 20 rejected, 0 errors
+
+Level 250: Correctness 100.0% (250/250 validated correctly)
+  Client-server time: .666277116s at 375.21 ops/sec
+  Validation processing: 2.223472920s
+  System overhead: 2.101262029s
+  Response breakdown: 57 new, 143 conflicts, 50 rejected, 0 errors
+
+Level 500: Correctness 100.0% (500/500 validated correctly)
+  Client-server time: 1.363635710s at 366.66 ops/sec
+  Validation processing: 4.396397034s
+  System overhead: 3.879062488s
+  Response breakdown: 107 new, 293 conflicts, 100 rejected, 0 errors
+
+Level 750: Correctness 100.0% (750/750 validated correctly)
+  Client-server time: 2.041000460s at 367.46 ops/sec
+  Validation processing: 6.568707760s
+  System overhead: 5.633230794s
+  Response breakdown: 157 new, 443 conflicts, 150 rejected, 0 errors
+
+Level 1000: Correctness 100.0% (1000/1000 validated correctly)
+  Client-server time: 2.925092412s at 341.86 ops/sec
+  Validation processing: 8.959698358s
+  System overhead: 7.544678747s
+  Response breakdown: 207 new, 593 conflicts, 200 rejected, 0 errors
+
+Level 2000: Correctness 100.0% (2000/2000 validated correctly)
+  Client-server time: 6.198328473s at 322.66 ops/sec
+  Validation processing: 11.608915452s
+  System overhead: 14.831119617s
+  Response breakdown: 407 new, 1193 conflicts, 400 rejected, 0 errors
+
+Level 3000: Correctness 100.0% (3000/3000 validated correctly)
+  Client-server time: 10.112717419s at 296.65 ops/sec
+  Validation processing: 12.217731053s
+  System overhead: 22.021132915s
+  Response breakdown: 607 new, 1793 conflicts, 600 rejected, 0 errors
+
+Level 5000: Correctness 100.0% (5000/5000 validated correctly)
+  Client-server time: 19.289021145s at 259.21 ops/sec
+  Validation processing: 13.766770231s
+  System overhead: 36.472551886s
+  Response breakdown: 1007 new, 2993 conflicts, 1000 rejected, 0 errors
+
+Level 10000: Correctness 100.0% (10000/10000 validated correctly)
+  Client-server time: 51.178112746s at 195.39 ops/sec
+  Validation processing: 19.862180659s
+  System overhead: 71.832586639s
+  Response breakdown: 2007 new, 5993 conflicts, 2000 rejected, 0 errors
 
 SUMMARY:
 Maximum tested concurrency: 10000 concurrent connections
-Best success rate achieved: 100.0%
-Peak throughput: 382.36 ops/sec
+Server correctness rate: 100.0% (individual input-output validation)
+Peak throughput: 379.11 ops/sec
+Total test execution time: 373.848318866s (6.2 minutes)
+Test methodology: Individual validation of each input against expected outcome
+Input distribution: 50% conflicts, 20% unique, 10% edge cases, 10% invalid IPs, 10% invalid ports
 Test levels: 50 100 250 500 750 1000 2000 3000 5000 10000
+
+Note: Total execution time includes client-server communication, validation processing,
+and system overhead (server startup/shutdown, process management, file I/O operations,
+resource cleanup, memory/descriptor cleanup, cleanup verification between test levels).
