@@ -1,76 +1,76 @@
 Stress Test Results - Maximum Concurrency
 =========================================
-Timestamp: Fri Sep  5 13:49:03 BST 2025
+Timestamp: Fri Sep  5 15:51:34 BST 2025
 
 Level 50: Correctness 100.0% (50/50 validated correctly)
-  Client-server time: .152251633s at 328.40 ops/sec
-  Validation processing: .406267782s
-  System overhead: .528311419s
+  Client-server time: .145644300s at 343.30 ops/sec
+  Validation processing: .424873330s
+  System overhead: .539081714s
   Response breakdown: 17 new, 23 conflicts, 10 rejected, 0 errors
 
 Level 100: Correctness 100.0% (100/100 validated correctly)
-  Client-server time: .265688825s at 376.38 ops/sec
-  Validation processing: .856451027s
-  System overhead: .861788576s
+  Client-server time: .263769746s at 379.11 ops/sec
+  Validation processing: .876375960s
+  System overhead: .936243692s
   Response breakdown: 27 new, 53 conflicts, 20 rejected, 0 errors
 
 Level 250: Correctness 100.0% (250/250 validated correctly)
-  Client-server time: .653065267s at 382.81 ops/sec
-  Validation processing: 2.230317530s
-  System overhead: 2.040858379s
+  Client-server time: .666277116s at 375.21 ops/sec
+  Validation processing: 2.223472920s
+  System overhead: 2.101262029s
   Response breakdown: 57 new, 143 conflicts, 50 rejected, 0 errors
 
 Level 500: Correctness 100.0% (500/500 validated correctly)
-  Client-server time: 1.393527641s at 358.80 ops/sec
-  Validation processing: 4.424047995s
-  System overhead: 3.611707143s
+  Client-server time: 1.363635710s at 366.66 ops/sec
+  Validation processing: 4.396397034s
+  System overhead: 3.879062488s
   Response breakdown: 107 new, 293 conflicts, 100 rejected, 0 errors
 
 Level 750: Correctness 100.0% (750/750 validated correctly)
-  Client-server time: 2.082617687s at 360.12 ops/sec
-  Validation processing: 6.638422230s
-  System overhead: 5.621162819s
+  Client-server time: 2.041000460s at 367.46 ops/sec
+  Validation processing: 6.568707760s
+  System overhead: 5.633230794s
   Response breakdown: 157 new, 443 conflicts, 150 rejected, 0 errors
 
 Level 1000: Correctness 100.0% (1000/1000 validated correctly)
-  Client-server time: 3.226379592s at 309.94 ops/sec
-  Validation processing: 9.194042605s
-  System overhead: 7.509876627s
+  Client-server time: 2.925092412s at 341.86 ops/sec
+  Validation processing: 8.959698358s
+  System overhead: 7.544678747s
   Response breakdown: 207 new, 593 conflicts, 200 rejected, 0 errors
 
 Level 2000: Correctness 100.0% (2000/2000 validated correctly)
-  Client-server time: 6.088344919s at 328.49 ops/sec
-  Validation processing: 11.242839773s
-  System overhead: 14.810844549s
+  Client-server time: 6.198328473s at 322.66 ops/sec
+  Validation processing: 11.608915452s
+  System overhead: 14.831119617s
   Response breakdown: 407 new, 1193 conflicts, 400 rejected, 0 errors
 
 Level 3000: Correctness 100.0% (3000/3000 validated correctly)
-  Client-server time: 10.106987356s at 296.82 ops/sec
-  Validation processing: 11.643556739s
-  System overhead: 21.281653841s
+  Client-server time: 10.112717419s at 296.65 ops/sec
+  Validation processing: 12.217731053s
+  System overhead: 22.021132915s
   Response breakdown: 607 new, 1793 conflicts, 600 rejected, 0 errors
 
 Level 5000: Correctness 100.0% (5000/5000 validated correctly)
-  Client-server time: 18.714051890s at 267.17 ops/sec
-  Validation processing: 13.427591794s
-  System overhead: 36.393244836s
+  Client-server time: 19.289021145s at 259.21 ops/sec
+  Validation processing: 13.766770231s
+  System overhead: 36.472551886s
   Response breakdown: 1007 new, 2993 conflicts, 1000 rejected, 0 errors
 
 Level 10000: Correctness 100.0% (10000/10000 validated correctly)
-  Client-server time: 51.319815967s at 194.85 ops/sec
-  Validation processing: 19.881751222s
-  System overhead: 72.201074620s
+  Client-server time: 51.178112746s at 195.39 ops/sec
+  Validation processing: 19.862180659s
+  System overhead: 71.832586639s
   Response breakdown: 2007 new, 5993 conflicts, 2000 rejected, 0 errors
-
 
 SUMMARY:
 Maximum tested concurrency: 10000 concurrent connections
 Server correctness rate: 100.0% (individual input-output validation)
-Peak throughput: 382.81 ops/sec
-Total test execution time: 372.471577716s (6.2 minutes)
+Peak throughput: 379.11 ops/sec
+Total test execution time: 373.848318866s (6.2 minutes)
 Test methodology: Individual validation of each input against expected outcome
 Input distribution: 50% conflicts, 20% unique, 10% edge cases, 10% invalid IPs, 10% invalid ports
 Test levels: 50 100 250 500 750 1000 2000 3000 5000 10000
 
 Note: Total execution time includes client-server communication, validation processing,
-and system overhead (process cleanup, file I/O, resource management between test levels).
+and system overhead (server startup/shutdown, process management, file I/O operations,
+resource cleanup, memory/descriptor cleanup, cleanup verification between test levels).

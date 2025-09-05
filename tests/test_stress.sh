@@ -198,10 +198,17 @@ test_stress_level() {
     
     echo "All $level clients launched, waiting for completion..."
     
-    # Wait for all processes
+    # Wait for all processes and track failures
+    local process_failures=0
     for pid in "${client_pids[@]}"; do
-        wait $pid 2>/dev/null
+        if ! wait $pid; then
+            process_failures=$((process_failures + 1))
+        fi
     done
+    
+    if (( process_failures > 0 )); then
+        echo "Warning: $process_failures client processes failed during execution"
+    fi
     
     local end_time=$(date +%s.%N)
     local duration=$(echo "$end_time - $start_time" | bc -l)
@@ -340,12 +347,18 @@ test_stress_level() {
     local real_correctness_rate=$(echo "scale=1; $correct_validations * 100 / $total_validations" | bc -l)
     
     # Aggregate response counts for comparison
+    # Count response types and capture any missing files for diagnostics
     local successful=$(grep -l "Rule added" stress_${level}_*.tmp 2>/dev/null | wc -l)
     local already_exists=$(grep -l "Rule already exists" stress_${level}_*.tmp 2>/dev/null | wc -l)
     local invalid=$(grep -l "Invalid rule" stress_${level}_*.tmp 2>/dev/null | wc -l)
     local connection_failed=$(grep -l "Connection refused\|Connection reset\|Connection timed out" stress_${level}_*.tmp 2>/dev/null | wc -l)
     local empty_responses=$(find . -name "stress_${level}_*.tmp" -size 0 2>/dev/null | wc -l)
     local total_files=$(ls stress_${level}_*.tmp 2>/dev/null | wc -l)
+    
+    # Check if any expected client output files are missing
+    if (( total_files != level )); then
+        echo "Warning: Expected $level output files, found $total_files"
+    fi
     
     # Calculate metrics
     local actual_errors=$((connection_failed + empty_responses))
@@ -398,6 +411,9 @@ test_stress_level() {
     echo "  Validation processing: ${validation_duration}s" >> "$STRESS_RESULTS"
     echo "  System overhead: ${system_overhead_time}s" >> "$STRESS_RESULTS"
     echo "  Response breakdown: ${successful} new, ${already_exists} conflicts, ${invalid} rejected, ${actual_errors} errors" >> "$STRESS_RESULTS"
+    if (( process_failures > 0 )); then
+        echo "  Process failures: ${process_failures} client processes terminated unexpectedly" >> "$STRESS_RESULTS"
+    fi
     echo "" >> "$STRESS_RESULTS"
     
     # Server cleanup and verification
@@ -461,7 +477,6 @@ echo "Test suite completed at: $(date)"
 echo "Total test execution time: ${TOTAL_DURATION}s ($(echo "scale=1; $TOTAL_DURATION / 60" | bc -l) minutes)"
 
 # Generate dynamic summary based on actual results
-echo "" >> "$STRESS_RESULTS"
 echo "SUMMARY:" >> "$STRESS_RESULTS"
 
 # Calculate best performing level
