@@ -176,7 +176,6 @@ test_stress_level() {
     
     "$PROJECT_ROOT/server" 2302 > "server_stress_$level.log" 2>&1 &
     local server_pid=$!
-    sleep 2
     
     if ! kill -0 $server_pid 2>/dev/null; then
         echo "Server failed to start"
@@ -401,12 +400,38 @@ test_stress_level() {
     echo "  Response breakdown: ${successful} new, ${already_exists} conflicts, ${invalid} rejected, ${actual_errors} errors" >> "$STRESS_RESULTS"
     echo "" >> "$STRESS_RESULTS"
     
-    # Cleanup
+    # Server cleanup and verification
     kill $server_pid 2>/dev/null
-    sleep 1
+    verify_server_cleanup
     rm -f stress_${level}_*.tmp "server_stress_$level.log" "$validation_log"
     
     return 0
+}
+
+# Verify server processes are completely terminated
+verify_server_cleanup() {
+    local max_attempts=10
+    local attempt=0
+    
+    while (( attempt < max_attempts )); do
+        # Check for any remaining server processes
+        local server_processes=$(pgrep -f "server 2302" 2>/dev/null | wc -l)
+        local port_processes=$(lsof -ti:2302 2>/dev/null | wc -l)
+        
+        if (( server_processes == 0 && port_processes == 0 )); then
+            echo "Server cleanup verification: PASSED"
+            return 0
+        fi
+        
+        attempt=$((attempt + 1))
+        sleep 0.5
+    done
+    
+    # Force cleanup if verification failed
+    echo "Server cleanup verification: FAILED - forcing cleanup"
+    pkill -f "server 2302" 2>/dev/null
+    lsof -ti:2302 2>/dev/null | xargs kill -9 2>/dev/null
+    return 1
 }
 
 echo "Testing realistic IP/port generation algorithm:"
@@ -462,7 +487,8 @@ echo "Input distribution: 50% conflicts, 20% unique, 10% edge cases, 10% invalid
 echo "Test levels: ${STRESS_LEVELS[*]}" >> "$STRESS_RESULTS"
 echo "" >> "$STRESS_RESULTS"
 echo "Note: Total execution time includes client-server communication, validation processing," >> "$STRESS_RESULTS"
-echo "and system overhead (process cleanup, file I/O, resource management between test levels)." >> "$STRESS_RESULTS"
+echo "and system overhead (server startup/shutdown, process management, file I/O operations," >> "$STRESS_RESULTS"
+echo "resource cleanup, memory/descriptor cleanup, cleanup verification between test levels)." >> "$STRESS_RESULTS"
 
 echo -e "\n${GREEN}Stress test completed${NC}"
 echo -e "${BLUE}Results saved to: $STRESS_RESULTS${NC}"
