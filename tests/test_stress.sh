@@ -171,6 +171,7 @@ validate_client_result() {
 # Execute concurrency test at specified load level
 test_stress_level() {
     local level=$1
+    local test_level_start_time=$(date +%s.%N)
     echo -e "\nTesting $level concurrent connections"
     
     "$PROJECT_ROOT/server" 2302 > "server_stress_$level.log" 2>&1 &
@@ -206,7 +207,8 @@ test_stress_level() {
     local end_time=$(date +%s.%N)
     local duration=$(echo "$end_time - $start_time" | bc -l)
     
-    # Validate each client response individually using deterministic input regeneration
+    # Optimised validation with parallel processing for large test levels
+    local validation_start_time=$(date +%s.%N)
     echo "Performing individual input-output validation..."
     
     local correct_validations=0
@@ -219,37 +221,121 @@ test_stress_level() {
     validation_entries+=("# Individual Client Validation Log - Level $level")
     validation_entries+=("# Format: ClientID | Input | Expected | Actual | Validation")
     
-    for i in $(seq 1 $level); do
-        local ip_port=$(generate_realistic_ip_port $i)
-        local ip=$(echo $ip_port | cut -d' ' -f1)
-        local port=$(echo $ip_port | cut -d' ' -f2)
-        local expected=$(predict_expected_outcome "$ip" "$port" "$i")
-        local client_file="stress_${level}_$i.tmp"
+    # Use parallel processing for large test levels to improve performance
+    if (( level >= 2000 )); then
+        echo "Using parallel validation processing for $level clients..."
         
-        # Collect actual server response efficiently
-        local actual_response=""
-        if [[ -f "$client_file" ]]; then
-            actual_response=$(tr '\n' ' ' < "$client_file")
-        else
-            actual_response="NO_RESPONSE_FILE"
+        # Create temporary directory for parallel processing
+        local temp_dir="validation_temp_${level}"
+        mkdir -p "$temp_dir"
+        
+        # Split validation work into chunks processed in parallel
+        local chunk_size=1000
+        local chunk_pids=()
+        
+        for start in $(seq 1 $chunk_size $level); do
+            local end=$((start + chunk_size - 1))
+            if (( end > level )); then
+                end=$level
+            fi
+            
+            # Process chunk in background
+            {
+                for i in $(seq $start $end); do
+                    local ip_port=$(generate_realistic_ip_port $i)
+                    local ip=$(echo $ip_port | cut -d' ' -f1)
+                    local port=$(echo $ip_port | cut -d' ' -f2)
+                    local expected=$(predict_expected_outcome "$ip" "$port" "$i")
+                    local client_file="stress_${level}_$i.tmp"
+                    
+                    # Efficient response collection
+                    local actual_response=""
+                    if [[ -f "$client_file" ]]; then
+                        actual_response=$(tr '\n' ' ' < "$client_file")
+                    else
+                        actual_response="NO_RESPONSE_FILE"
+                    fi
+                    
+                    local validation_result=$(validate_client_result "$client_file" "$expected" "$ip" "$port")
+                    local validation_status=$?
+                    
+                    # Write chunk results to temporary file
+                    if [[ $validation_status -eq 0 ]]; then
+                        echo "PASS|$i | $ip:$port | $expected | $actual_response | $validation_result" >> "$temp_dir/chunk_$start.tmp"
+                    else
+                        echo "FAIL|$i | $ip:$port | $expected | $actual_response | $validation_result" >> "$temp_dir/chunk_$start.tmp"
+                        echo "Client $i ($ip:$port): $validation_result" >> "$temp_dir/failures.tmp"
+                    fi
+                done
+            } &
+            chunk_pids+=($!)
+        done
+        
+        # Wait for all parallel chunks to complete
+        for pid in "${chunk_pids[@]}"; do
+            wait $pid
+        done
+        
+        # Aggregate results from parallel processing
+        for chunk_file in "$temp_dir"/chunk_*.tmp; do
+            if [[ -f "$chunk_file" ]]; then
+                while IFS='|' read -r status entry; do
+                    validation_entries+=("$entry")
+                    total_validations=$((total_validations + 1))
+                    if [[ "$status" == "PASS" ]]; then
+                        correct_validations=$((correct_validations + 1))
+                    fi
+                done < "$chunk_file"
+            fi
+        done
+        
+        # Collect validation failures
+        if [[ -f "$temp_dir/failures.tmp" ]]; then
+            while IFS= read -r failure; do
+                validation_failures+=("$failure")
+            done < "$temp_dir/failures.tmp"
         fi
         
-        local validation_result=$(validate_client_result "$client_file" "$expected" "$ip" "$port")
-        local validation_status=$?
+        # Clean up temporary files
+        rm -rf "$temp_dir"
         
-        # Build validation log entry in memory
-        validation_entries+=("$i | $ip:$port | $expected | $actual_response | $validation_result")
-        
-        total_validations=$((total_validations + 1))
-        if [[ $validation_status -eq 0 ]]; then
-            correct_validations=$((correct_validations + 1))
-        else
-            validation_failures+=("Client $i ($ip:$port): $validation_result")
-        fi
-    done
+    else
+        # Sequential processing for smaller test levels (more efficient for small numbers)
+        for i in $(seq 1 $level); do
+            local ip_port=$(generate_realistic_ip_port $i)
+            local ip=$(echo $ip_port | cut -d' ' -f1)
+            local port=$(echo $ip_port | cut -d' ' -f2)
+            local expected=$(predict_expected_outcome "$ip" "$port" "$i")
+            local client_file="stress_${level}_$i.tmp"
+            
+            # Efficient response collection
+            local actual_response=""
+            if [[ -f "$client_file" ]]; then
+                actual_response=$(tr '\n' ' ' < "$client_file")
+            else
+                actual_response="NO_RESPONSE_FILE"
+            fi
+            
+            local validation_result=$(validate_client_result "$client_file" "$expected" "$ip" "$port")
+            local validation_status=$?
+            
+            validation_entries+=("$i | $ip:$port | $expected | $actual_response | $validation_result")
+            
+            total_validations=$((total_validations + 1))
+            if [[ $validation_status -eq 0 ]]; then
+                correct_validations=$((correct_validations + 1))
+            else
+                validation_failures+=("Client $i ($ip:$port): $validation_result")
+            fi
+        done
+    fi
     
     # Write complete validation log in single operation
     printf '%s\n' "${validation_entries[@]}" > "$validation_log"
+    
+    local validation_end_time=$(date +%s.%N)
+    local validation_duration=$(echo "$validation_end_time - $validation_start_time" | bc -l)
+    echo "Validation processing took: ${validation_duration}s"
     
     # Calculate individual validation success rate
     local real_correctness_rate=$(echo "scale=1; $correct_validations * 100 / $total_validations" | bc -l)
@@ -301,9 +387,19 @@ test_stress_level() {
     THROUGHPUT_RATES+=($throughput)
     TEST_DURATIONS+=($duration)
     
-    # Log test results with validation metrics
-    echo "Level $level: Correctness ${real_correctness_rate}% (${correct_validations}/${total_validations} validated correctly) in ${duration}s at ${throughput} ops/sec" >> "$STRESS_RESULTS"
-    echo "  Legacy breakdown: ${successful} new, ${already_exists} conflicts, ${invalid} rejected, ${actual_errors} errors" >> "$STRESS_RESULTS"
+    # Calculate system overhead time
+    local test_level_end_time=$(date +%s.%N)
+    local total_test_level_time=$(echo "$test_level_end_time - $test_level_start_time" | bc -l)
+    local client_and_validation_time=$(echo "$duration + $validation_duration" | bc -l)
+    local system_overhead_time=$(echo "$total_test_level_time - $client_and_validation_time" | bc -l)
+    
+    # Log test results with detailed timing breakdown
+    echo "Level $level: Correctness ${real_correctness_rate}% (${correct_validations}/${total_validations} validated correctly)" >> "$STRESS_RESULTS"
+    echo "  Client-server time: ${duration}s at ${throughput} ops/sec" >> "$STRESS_RESULTS"
+    echo "  Validation processing: ${validation_duration}s" >> "$STRESS_RESULTS"
+    echo "  System overhead: ${system_overhead_time}s" >> "$STRESS_RESULTS"
+    echo "  Response breakdown: ${successful} new, ${already_exists} conflicts, ${invalid} rejected, ${actual_errors} errors" >> "$STRESS_RESULTS"
+    echo "" >> "$STRESS_RESULTS"
     
     # Cleanup
     kill $server_pid 2>/dev/null
@@ -323,11 +419,21 @@ echo "Distribution: 50% common IPs (conflicts), 20% unique, 10% edge cases, 10% 
 
 # Execute stress tests at key concurrency levels
 echo -e "\nRunning stress tests:"
+
+# Record total test start time
+TOTAL_TEST_START=$(date +%s.%N)
+echo "Test suite started at: $(date)"
+
 for level in "${STRESS_LEVELS[@]}"; do
     test_stress_level $level
-    echo "Press Enter to continue..."
-    read -t 2
 done
+
+# Record total test end time and calculate duration
+TOTAL_TEST_END=$(date +%s.%N)
+TOTAL_DURATION=$(echo "$TOTAL_TEST_END - $TOTAL_TEST_START" | bc -l)
+echo ""
+echo "Test suite completed at: $(date)"
+echo "Total test execution time: ${TOTAL_DURATION}s ($(echo "scale=1; $TOTAL_DURATION / 60" | bc -l) minutes)"
 
 # Generate dynamic summary based on actual results
 echo "" >> "$STRESS_RESULTS"
@@ -347,14 +453,16 @@ for i in "${!SUCCESS_RATES[@]}"; do
     fi
 done
 
-echo "" >> "$STRESS_RESULTS"
-echo "FINAL SUMMARY:" >> "$STRESS_RESULTS"
 echo "Maximum tested concurrency: $max_tested_level concurrent connections" >> "$STRESS_RESULTS"
 echo "Server correctness rate: ${best_correctness_rate}% (individual input-output validation)" >> "$STRESS_RESULTS"
 echo "Peak throughput: ${best_throughput} ops/sec" >> "$STRESS_RESULTS"
+echo "Total test execution time: ${TOTAL_DURATION}s ($(echo "scale=1; $TOTAL_DURATION / 60" | bc -l) minutes)" >> "$STRESS_RESULTS"
 echo "Test methodology: Individual validation of each input against expected outcome" >> "$STRESS_RESULTS"
 echo "Input distribution: 50% conflicts, 20% unique, 10% edge cases, 10% invalid IPs, 10% invalid ports" >> "$STRESS_RESULTS"
 echo "Test levels: ${STRESS_LEVELS[*]}" >> "$STRESS_RESULTS"
+echo "" >> "$STRESS_RESULTS"
+echo "Note: Total execution time includes client-server communication, validation processing," >> "$STRESS_RESULTS"
+echo "and system overhead (process cleanup, file I/O, resource management between test levels)." >> "$STRESS_RESULTS"
 
 echo -e "\n${GREEN}Stress test completed${NC}"
 echo -e "${BLUE}Results saved to: $STRESS_RESULTS${NC}"
