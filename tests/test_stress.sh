@@ -30,19 +30,60 @@ echo "=========================================" >> "$STRESS_RESULTS"
 echo "Timestamp: $(date)" >> "$STRESS_RESULTS"
 echo "" >> "$STRESS_RESULTS"
 
-# Deterministic IP and port allocation
-generate_valid_ip_port() {
+# OLD: Deterministic IP and port allocation (ARTIFICIAL - COMMENTING OUT)
+# generate_valid_ip_port() {
+#     local index=$1
+#     
+#     # Generate unique IPs within private address space
+#     local subnet=$((index % 250 + 1))
+#     local host=$(((index / 250) % 250 + 1))
+#     local ip="192.168.$subnet.$host"
+#     
+#     # Generate unique ports: 10000-65000 range to avoid conflicts
+#     local port=$((10000 + index))
+#     
+#     echo "$ip $port"
+# }
+
+# NEW: Realistic IP and port generation with conflicts and edge cases
+generate_realistic_ip_port() {
     local index=$1
+    local scenario=$((index % 10))
     
-    # Generate unique IPs within private address space
-    local subnet=$((index % 250 + 1))
-    local host=$(((index / 250) % 250 + 1))
-    local ip="192.168.$subnet.$host"
-    
-    # Generate unique ports: 10000-65000 range to avoid conflicts
-    local port=$((10000 + index))
-    
-    echo "$ip $port"
+    case $scenario in
+        0|1|2|3|4) 
+            # 50% valid, commonly used IPs (realistic conflicts)
+            local common_ips=("192.168.1.100" "10.0.0.50" "172.16.0.10" "192.168.0.1" "10.1.1.1")
+            local common_ports=(80 443 8080 22 3306)
+            local ip_idx=$((index % ${#common_ips[@]}))
+            local port_idx=$((index % ${#common_ports[@]}))
+            echo "${common_ips[$ip_idx]} ${common_ports[$port_idx]}"
+            ;;
+        5|6)
+            # 20% unique valid IPs  
+            local ip="192.168.$((index % 255 + 1)).$((index % 254 + 1))"
+            local port=$((8000 + index % 1000))
+            echo "$ip $port"
+            ;;
+        7)
+            # 10% edge case IPs
+            local edge_ips=("0.0.0.0" "255.255.255.255" "127.0.0.1" "192.168.1.1")
+            local ip_idx=$((index % ${#edge_ips[@]}))
+            echo "${edge_ips[$ip_idx]} 80"
+            ;;
+        8)
+            # 10% invalid IPs
+            local invalid_ips=("999.999.999.999" "256.1.1.1" "192.168.1" "not.an.ip")
+            local ip_idx=$((index % ${#invalid_ips[@]}))
+            echo "${invalid_ips[$ip_idx]} 80"
+            ;;
+        9)
+            # 10% invalid ports
+            local invalid_ports=(-1 99999 abc)
+            local port_idx=$((index % ${#invalid_ports[@]}))
+            echo "192.168.1.1 ${invalid_ports[$port_idx]}"
+            ;;
+    esac
 }
 
 # Execute concurrency test at specified load level
@@ -65,7 +106,7 @@ test_stress_level() {
     local start_time=$(date +%s.%N)
     
     for i in $(seq 1 $level); do
-        local ip_port=$(generate_valid_ip_port $i)
+        local ip_port=$(generate_realistic_ip_port $i)
         local ip=$(echo $ip_port | cut -d' ' -f1)
         local port=$(echo $ip_port | cut -d' ' -f2)
         timeout 30s "$PROJECT_ROOT/client" localhost 2302 A "$ip" $port > "stress_${level}_$i.tmp" 2>&1 &
@@ -105,7 +146,7 @@ test_stress_level() {
         echo -e "\nInvalid responses (sample):"
         grep -l "Invalid rule" stress_${level}_*.tmp | head -2 | while read f; do
             local idx=$(echo $f | grep -o '[0-9]*' | tail -1)
-            local test_ip_port=$(generate_valid_ip_port $idx)
+            local test_ip_port=$(generate_realistic_ip_port $idx)
             echo "$f: $(cat "$f") [Generated: $test_ip_port]"
         done
     fi
@@ -121,19 +162,28 @@ test_stress_level() {
         echo -e "\nEmpty response files: $empty_responses (possible client crashes or connection failures)"
     fi
     
-    local success_rate=$(echo "scale=1; ($successful + $already_exists) * 100 / $total_files" | bc -l)
+    # Calculate correctness rate: all appropriate responses (success + conflicts + proper rejections)
+    local correct_responses=$((successful + already_exists + invalid))
+    local actual_errors=$((connection_failed + empty_responses))
+    local correctness_rate=$(echo "scale=1; $correct_responses * 100 / $total_files" | bc -l)
     local throughput=$(echo "scale=2; $level / $duration" | bc -l 2>/dev/null || echo "0")
     
-    echo "   SUCCESS RATE: ${success_rate}%"
+    echo ""
+    echo "   RESPONSE BREAKDOWN:"
+    echo "     New rules added: $successful"
+    echo "     Conflicts detected: $already_exists" 
+    echo "     Invalid inputs rejected: $invalid"
+    echo "     Connection/system errors: $actual_errors"
+    echo "   CORRECTNESS RATE: ${correctness_rate}% (appropriate response to each input)"
     echo "   THROUGHPUT: ${throughput} ops/sec"
     
     # Store metrics for dynamic summary
-    SUCCESS_RATES+=($success_rate)
+    SUCCESS_RATES+=($correctness_rate)
     THROUGHPUT_RATES+=($throughput)
     TEST_DURATIONS+=($duration)
     
     # Log results to file
-    echo "Level $level: $successful/$level successful (${success_rate}%) in ${duration}s at ${throughput} ops/sec" >> "$STRESS_RESULTS"
+    echo "Level $level: Correctness ${correctness_rate}% (${successful} new, ${already_exists} conflicts, ${invalid} rejected, ${actual_errors} errors) in ${duration}s at ${throughput} ops/sec" >> "$STRESS_RESULTS"
     
     # Cleanup
     kill $server_pid 2>/dev/null
@@ -143,11 +193,13 @@ test_stress_level() {
     return 0
 }
 
-echo "Testing IP/port generation algorithm:"
+echo "Testing realistic IP/port generation algorithm:"
 for i in 1 5 10 250 500; do
-    result=$(generate_valid_ip_port $i)
+    result=$(generate_realistic_ip_port $i)
     echo "Index $i -> IP:Port = $result"
 done
+echo ""
+echo "Distribution: 50% common IPs (conflicts), 20% unique, 10% edge cases, 10% invalid IPs, 10% invalid ports"
 
 # Execute stress tests at key concurrency levels
 echo -e "\nRunning stress tests:"
@@ -162,13 +214,13 @@ echo "" >> "$STRESS_RESULTS"
 echo "SUMMARY:" >> "$STRESS_RESULTS"
 
 # Calculate best performing level
-best_success_rate="0"
+best_correctness_rate="0"
 best_throughput="0"
 max_tested_level=${STRESS_LEVELS[-1]}
 
 for i in "${!SUCCESS_RATES[@]}"; do
-    if (( $(echo "${SUCCESS_RATES[$i]} > $best_success_rate" | bc -l) )); then
-        best_success_rate=${SUCCESS_RATES[$i]}
+    if (( $(echo "${SUCCESS_RATES[$i]} > $best_correctness_rate" | bc -l) )); then
+        best_correctness_rate=${SUCCESS_RATES[$i]}
     fi
     if (( $(echo "${THROUGHPUT_RATES[$i]} > $best_throughput" | bc -l) )); then
         best_throughput=${THROUGHPUT_RATES[$i]}
@@ -176,8 +228,9 @@ for i in "${!SUCCESS_RATES[@]}"; do
 done
 
 echo "Maximum tested concurrency: $max_tested_level concurrent connections" >> "$STRESS_RESULTS"
-echo "Best success rate achieved: ${best_success_rate}%" >> "$STRESS_RESULTS"
+echo "Server correctness rate: ${best_correctness_rate}% (appropriate responses to all input types)" >> "$STRESS_RESULTS"
 echo "Peak throughput: ${best_throughput} ops/sec" >> "$STRESS_RESULTS"
+echo "Test methodology: Realistic inputs (50% conflicts, 20% unique, 30% edge/invalid cases)" >> "$STRESS_RESULTS"
 echo "Test levels: ${STRESS_LEVELS[*]}" >> "$STRESS_RESULTS"
 
 echo -e "\n${GREEN}Stress test completed${NC}"

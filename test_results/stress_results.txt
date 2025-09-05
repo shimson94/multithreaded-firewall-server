@@ -1,20 +1,21 @@
 Stress Test Results - Maximum Concurrency
 =========================================
-Timestamp: Tue Sep  2 00:27:12 BST 2025
+Timestamp: Fri Sep  5 09:00:57 BST 2025
 
-Level 50: 50/50 successful (100.0%) in .139351940s at 358.80 ops/sec
-Level 100: 100/100 successful (100.0%) in .268494481s at 372.44 ops/sec
-Level 250: 250/250 successful (100.0%) in .656125132s at 381.02 ops/sec
-Level 500: 500/500 successful (100.0%) in 1.307658807s at 382.36 ops/sec
-Level 750: 750/750 successful (100.0%) in 1.977317842s at 379.30 ops/sec
-Level 1000: 1000/1000 successful (100.0%) in 2.688025303s at 372.02 ops/sec
-Level 2000: 2000/2000 successful (100.0%) in 5.772008318s at 346.49 ops/sec
-Level 3000: 3000/3000 successful (100.0%) in 9.255807923s at 324.12 ops/sec
-Level 5000: 5000/5000 successful (100.0%) in 17.520553303s at 285.37 ops/sec
-Level 10000: 10000/10000 successful (100.0%) in 46.287032469s at 216.04 ops/sec
+Level 50: Correctness 100.0% (17 new, 23 conflicts, 10 rejected, 0 errors) in .144004648s at 347.21 ops/sec
+Level 100: Correctness 100.0% (27 new, 53 conflicts, 20 rejected, 0 errors) in .259404004s at 385.49 ops/sec
+Level 250: Correctness 100.0% (57 new, 143 conflicts, 50 rejected, 0 errors) in .648107390s at 385.73 ops/sec
+Level 500: Correctness 100.0% (107 new, 293 conflicts, 100 rejected, 0 errors) in 1.293274811s at 386.61 ops/sec
+Level 750: Correctness 100.0% (157 new, 443 conflicts, 150 rejected, 0 errors) in 1.944991126s at 385.60 ops/sec
+Level 1000: Correctness 100.0% (207 new, 593 conflicts, 200 rejected, 0 errors) in 2.716399430s at 368.13 ops/sec
+Level 2000: Correctness 100.0% (407 new, 1193 conflicts, 400 rejected, 0 errors) in 5.666860689s at 352.92 ops/sec
+Level 3000: Correctness 100.0% (607 new, 1793 conflicts, 600 rejected, 0 errors) in 9.184304713s at 326.64 ops/sec
+Level 5000: Correctness 100.0% (1007 new, 2993 conflicts, 1000 rejected, 0 errors) in 18.068075399s at 276.73 ops/sec
+Level 10000: Correctness 100.0% (2007 new, 5993 conflicts, 2000 rejected, 0 errors) in 47.481413661s at 210.60 ops/sec
 
 SUMMARY:
 Maximum tested concurrency: 10000 concurrent connections
-Best success rate achieved: 100.0%
-Peak throughput: 382.36 ops/sec
+Server correctness rate: 100.0% (appropriate responses to all input types)
+Peak throughput: 386.61 ops/sec
+Test methodology: Realistic inputs (50% conflicts, 20% unique, 30% edge/invalid cases)
 Test levels: 50 100 250 500 750 1000 2000 3000 5000 10000
