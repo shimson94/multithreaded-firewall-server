@@ -1,13 +1,28 @@
-Concurrency Test Results
-========================
-Timestamp: Mon Sep  1 17:52:38 BST 2025
+Concurrency Test Results - Mixed Operations
+===========================================
+Timestamp: Mon Sep  8 23:58:34 BST 2025
 
-Sequential Test: 50/50 successful in .248678751s
-Low Concurrency (25): 25/25 successful in .006948872s
-Medium Concurrency (100): 100/100 successful in .012938647s
-High Concurrency (250): 250/250 successful in .032618939s
-Mixed Operations: Add(100/100), Check(100/100), List(25/25) in .036309873s
-Final rule count: 47
+
+Level 100: Correctness 100.0% (100/100 validated correctly)
+  Duration: .133270124s at 750.35 ops/sec
+  Response breakdown: 5 ADD-new, 15 ADD-conflicts, 10 rejected, 10 CHECK-accepted, 10 CHECK-rejected, 25 LIST, 25 DELETE, 0 errors
+
+Level 500: Correctness 100.0% (500/500 validated correctly)
+  Duration: .530876744s at 941.83 ops/sec
+  Response breakdown: 25 ADD-new, 75 ADD-conflicts, 50 rejected, 50 CHECK-accepted, 50 CHECK-rejected, 125 LIST, 125 DELETE, 0 errors
+
+Level 1000: Correctness 100.0% (1000/1000 validated correctly)
+  Duration: 1.044001553s at 957.85 ops/sec
+  Response breakdown: 50 ADD-new, 150 ADD-conflicts, 100 rejected, 100 CHECK-accepted, 100 CHECK-rejected, 250 LIST, 250 DELETE, 0 errors
+
+Level 2500: Correctness 100.0% (2500/2500 validated correctly)
+  Duration: 2.639294244s at 947.22 ops/sec
+  Response breakdown: 125 ADD-new, 375 ADD-conflicts, 250 rejected, 250 CHECK-accepted, 250 CHECK-rejected, 625 LIST, 625 DELETE, 0 errors
 
 SUMMARY:
-Overall Success Rate: 525/525 (100.0%)
+Maximum tested concurrency: 2500 concurrent mixed operations
+Server correctness rate: 100.0% (mixed operation validation)
+Peak throughput: Mixed operations per second (varies by test level)
+Test methodology: Mixed ADD/CHECK/LIST/DELETE operations with race condition detection
+Input distribution: 50% conflicts, 20% unique, 10% edge cases, 10% invalid IPs, 10% invalid ports
+Test levels: 100 500 1000 2500

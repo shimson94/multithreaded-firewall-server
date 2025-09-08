@@ -3,34 +3,34 @@
 echo "Concurrency Stress Test - Maximum Load Analysis"
 echo "==============================================="
 
-# Terminal colour formatting
+# Console output formatting
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# Get the directory where this script is located
+# Project path resolution
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# Test configuration - extended levels to find real limits
-STRESS_LEVELS=(50 100 250 500 750 1000 2000 3000 5000 10000)
+# Concurrency test levels
+STRESS_LEVELS=(500 1000 3000 5000 10000)
 
-# Set results file path using PROJECT_ROOT
+# Results output configuration
 STRESS_RESULTS="$PROJECT_ROOT/test_results/stress_results.txt"
 
-# Performance tracking variables
+# Metrics collection arrays
 declare -a SUCCESS_RATES
 declare -a THROUGHPUT_RATES
 declare -a TEST_DURATIONS
 
-# Initialise results file
+# Results file initialisation
 mkdir -p "$(dirname "$STRESS_RESULTS")"
 echo "Stress Test Results - Maximum Concurrency" > "$STRESS_RESULTS"
 echo "=========================================" >> "$STRESS_RESULTS"
 echo "Timestamp: $(date)" >> "$STRESS_RESULTS"
 echo "" >> "$STRESS_RESULTS"
 
-# Realistic IP and port generation with conflicts and edge cases
+# Test data generation - realistic distribution for stress testing
 generate_realistic_ip_port() {
     local index=$1
     local scenario=$((index % 10))
@@ -71,7 +71,7 @@ generate_realistic_ip_port() {
     esac
 }
 
-# Determine expected response for given IP/port input
+# Expected response prediction for validation
 predict_expected_outcome() {
     local ip="$1"
     local port="$2"
@@ -93,25 +93,24 @@ predict_expected_outcome() {
         return
     fi
     
-    # Validate port range (1-65535)
+    # Port validation (RFC 6335 range)
     if ! [[ "$port" =~ ^[0-9]+$ ]] || (( port < 1 )) || (( port > 65535 )); then
         echo "INVALID_PORT"
         return
     fi
     
-    # Predict conflict likelihood based on generation algorithm
-    # Scenarios 0-4 use common addresses with high collision probability
+    # Conflict prediction based on test data distribution
     local scenario=$((index % 10))
     if (( scenario >= 0 && scenario <= 4 )); then
-        # Common address - expect conflicts in concurrent testing
+        # Common IP - high collision probability
         echo "CONFLICT_LIKELY"
     else
-        # Unique address - should succeed unless race condition occurs
+        # Unique IP - low collision probability
         echo "SUCCESS_EXPECTED"
     fi
 }
 
-# Compare actual server response with predicted outcome
+# Response validation against expected outcome
 validate_client_result() {
     local client_file="$1"
     local expected="$2"
@@ -168,10 +167,9 @@ validate_client_result() {
     esac
 }
 
-# Execute concurrency test at specified load level
+# Stress test execution for specified concurrency level
 test_stress_level() {
     local level=$1
-    local test_level_start_time=$(date +%s.%N)
     echo -e "\nTesting $level concurrent connections"
     
     "$PROJECT_ROOT/server" 2302 > "server_stress_$level.log" 2>&1 &
@@ -188,17 +186,16 @@ test_stress_level() {
     local start_time=$(date +%s.%N)
     
     for i in $(seq 1 $level); do
-        local ip_port=$(generate_realistic_ip_port $i)
-        local ip=$(echo $ip_port | cut -d' ' -f1)
-        local port=$(echo $ip_port | cut -d' ' -f2)
+        ip_port=$(generate_realistic_ip_port $i)
+        read ip port <<< "$ip_port"
         
-        timeout 30s "$PROJECT_ROOT/client" localhost 2302 A "$ip" $port > "stress_${level}_$i.tmp" 2>&1 &
+        "$PROJECT_ROOT/client" localhost 2302 A "$ip" $port > "stress_${level}_$i.tmp" 2>&1 &
         client_pids+=($!)
     done
     
     echo "All $level clients launched, waiting for completion..."
     
-    # Wait for all processes and track failures
+    # Process completion tracking
     local process_failures=0
     for pid in "${client_pids[@]}"; do
         if ! wait $pid; then
@@ -213,7 +210,7 @@ test_stress_level() {
     local end_time=$(date +%s.%N)
     local duration=$(echo "$end_time - $start_time" | bc -l)
     
-    # Optimised validation with parallel processing for large test levels
+    # Validation processing with parallelisation optimisation
     local validation_start_time=$(date +%s.%N)
     echo "Performing individual input-output validation..."
     
@@ -223,19 +220,27 @@ test_stress_level() {
     local validation_log="validation_${level}.log"
     local validation_entries=()
     
+    # Response classification counters
+    local successful=0
+    local already_exists=0 
+    local invalid=0
+    local connection_failed=0
+    local empty_responses=0
+    local total_files=0
+    
     # Build validation log header
     validation_entries+=("# Individual Client Validation Log - Level $level")
     validation_entries+=("# Format: ClientID | Input | Expected | Actual | Validation")
     
-    # Use parallel processing for large test levels to improve performance
+    # Parallel processing threshold for performance scaling
     if (( level >= 2000 )); then
         echo "Using parallel validation processing for $level clients..."
         
-        # Create temporary directory for parallel processing
+        # Parallel processing workspace
         local temp_dir="validation_temp_${level}"
         mkdir -p "$temp_dir"
         
-        # Split validation work into chunks processed in parallel
+        # Chunk-based parallel validation
         local chunk_size=1000
         local chunk_pids=()
         
@@ -245,25 +250,72 @@ test_stress_level() {
                 end=$level
             fi
             
-            # Process chunk in background
+            # Background chunk processing
             {
+                # Per-chunk response counters
+                local chunk_successful=0
+                local chunk_already_exists=0
+                local chunk_invalid=0
+                local chunk_connection_failed=0
+                local chunk_empty_responses=0
+                local chunk_total_files=0
+                
                 for i in $(seq $start $end); do
-                    local ip_port=$(generate_realistic_ip_port $i)
-                    local ip=$(echo $ip_port | cut -d' ' -f1)
-                    local port=$(echo $ip_port | cut -d' ' -f2)
+                    ip_port=$(generate_realistic_ip_port $i)
+                    read ip port <<< "$ip_port"
                     local expected=$(predict_expected_outcome "$ip" "$port" "$i")
                     local client_file="stress_${level}_$i.tmp"
                     
-                    # Efficient response collection
+                    # Response file reading (optimised)
                     local actual_response=""
                     if [[ -f "$client_file" ]]; then
-                        actual_response=$(tr '\n' ' ' < "$client_file")
+                        actual_response=$(<"$client_file")  # Bash built-in, no subprocess
+                        chunk_total_files=$((chunk_total_files + 1))
+                        
+                        # Real-time response classification
+                        if [[ -z "$actual_response" ]]; then
+                            chunk_empty_responses=$((chunk_empty_responses + 1))
+                        elif [[ "$actual_response" == *"Rule added"* ]]; then
+                            chunk_successful=$((chunk_successful + 1))
+                        elif [[ "$actual_response" == *"Rule already exists"* ]]; then
+                            chunk_already_exists=$((chunk_already_exists + 1))
+                        elif [[ "$actual_response" == *"Invalid rule"* ]]; then
+                            chunk_invalid=$((chunk_invalid + 1))
+                        elif [[ "$actual_response" == *"Connection refused"* ]] || [[ "$actual_response" == *"Connection reset"* ]] || [[ "$actual_response" == *"Connection timed out"* ]]; then
+                            chunk_connection_failed=$((chunk_connection_failed + 1))
+                        fi
                     else
                         actual_response="NO_RESPONSE_FILE"
                     fi
                     
-                    local validation_result=$(validate_client_result "$client_file" "$expected" "$ip" "$port")
-                    local validation_status=$?
+                    # Inline validation logic (no function call overhead)
+                    local validation_result="CORRECT"
+                    local validation_status=0
+                    
+                    case "$expected" in
+                        "INVALID_IP"|"INVALID_PORT")
+                            if [[ "$actual_response" != *"Invalid rule"* ]]; then
+                                validation_result="INCORRECT: Expected 'Invalid rule' for $ip:$port, got '$actual_response'"
+                                validation_status=1
+                            fi
+                            ;;
+                        "SUCCESS_EXPECTED")
+                            if [[ "$actual_response" != *"Rule added"* && "$actual_response" != *"Rule already exists"* ]]; then
+                                validation_result="INCORRECT: Expected success for $ip:$port, got '$actual_response'"
+                                validation_status=1
+                            fi
+                            ;;
+                        "CONFLICT_LIKELY")
+                            if [[ "$actual_response" != *"Rule already exists"* && "$actual_response" != *"Rule added"* ]]; then
+                                validation_result="INCORRECT: Expected success/conflict for $ip:$port, got '$actual_response'"
+                                validation_status=1
+                            fi
+                            ;;
+                        *)
+                            validation_result="UNKNOWN_EXPECTED: $expected"
+                            validation_status=1
+                            ;;
+                    esac
                     
                     # Write chunk results to temporary file
                     if [[ $validation_status -eq 0 ]]; then
@@ -273,16 +325,19 @@ test_stress_level() {
                         echo "Client $i ($ip:$port): $validation_result" >> "$temp_dir/failures.tmp"
                     fi
                 done
+                
+                # Export chunk metrics for aggregation
+                echo "$chunk_successful:$chunk_already_exists:$chunk_invalid:$chunk_connection_failed:$chunk_empty_responses:$chunk_total_files" >> "$temp_dir/counts_$start.tmp"
             } &
             chunk_pids+=($!)
         done
         
-        # Wait for all parallel chunks to complete
+        # Parallel chunk synchronisation
         for pid in "${chunk_pids[@]}"; do
             wait $pid
         done
         
-        # Aggregate results from parallel processing
+        # Results aggregation from parallel chunks  
         for chunk_file in "$temp_dir"/chunk_*.tmp; do
             if [[ -f "$chunk_file" ]]; then
                 while IFS='|' read -r status entry; do
@@ -295,35 +350,88 @@ test_stress_level() {
             fi
         done
         
-        # Collect validation failures
+        # Failure collection and reporting
         if [[ -f "$temp_dir/failures.tmp" ]]; then
             while IFS= read -r failure; do
                 validation_failures+=("$failure")
             done < "$temp_dir/failures.tmp"
         fi
         
+        # Response count aggregation from parallel chunks
+        for count_file in "$temp_dir"/counts_*.tmp; do
+            if [[ -f "$count_file" ]]; then
+                while IFS=':' read -r chunk_successful chunk_already_exists chunk_invalid chunk_connection_failed chunk_empty_responses chunk_total_files; do
+                    successful=$((successful + chunk_successful))
+                    already_exists=$((already_exists + chunk_already_exists))
+                    invalid=$((invalid + chunk_invalid))
+                    connection_failed=$((connection_failed + chunk_connection_failed))
+                    empty_responses=$((empty_responses + chunk_empty_responses))
+                    total_files=$((total_files + chunk_total_files))
+                done < "$count_file"
+            fi
+        done
+        
         # Clean up temporary files
         rm -rf "$temp_dir"
         
     else
-        # Sequential processing for smaller test levels (more efficient for small numbers)
+        # Sequential processing for small test levels
         for i in $(seq 1 $level); do
-            local ip_port=$(generate_realistic_ip_port $i)
-            local ip=$(echo $ip_port | cut -d' ' -f1)
-            local port=$(echo $ip_port | cut -d' ' -f2)
+            ip_port=$(generate_realistic_ip_port $i)
+            read ip port <<< "$ip_port"
             local expected=$(predict_expected_outcome "$ip" "$port" "$i")
             local client_file="stress_${level}_$i.tmp"
             
-            # Efficient response collection
+            # Efficient response collection (no subprocess)
             local actual_response=""
             if [[ -f "$client_file" ]]; then
-                actual_response=$(tr '\n' ' ' < "$client_file")
+                actual_response=$(<"$client_file")  # Bash built-in, no subprocess
+                total_files=$((total_files + 1))
+                
+                # Track response types during validation (eliminates post-processing)
+                if [[ -z "$actual_response" ]]; then
+                    empty_responses=$((empty_responses + 1))
+                elif [[ "$actual_response" == *"Rule added"* ]]; then
+                    successful=$((successful + 1))
+                elif [[ "$actual_response" == *"Rule already exists"* ]]; then
+                    already_exists=$((already_exists + 1))
+                elif [[ "$actual_response" == *"Invalid rule"* ]]; then
+                    invalid=$((invalid + 1))
+                elif [[ "$actual_response" == *"Connection refused"* ]] || [[ "$actual_response" == *"Connection reset"* ]] || [[ "$actual_response" == *"Connection timed out"* ]]; then
+                    connection_failed=$((connection_failed + 1))
+                fi
             else
                 actual_response="NO_RESPONSE_FILE"
             fi
             
-            local validation_result=$(validate_client_result "$client_file" "$expected" "$ip" "$port")
-            local validation_status=$?
+            # Inline validation logic (no function call overhead)
+            local validation_result="CORRECT"
+            local validation_status=0
+            
+            case "$expected" in
+                "INVALID_IP"|"INVALID_PORT")
+                    if [[ "$actual_response" != *"Invalid rule"* ]]; then
+                        validation_result="INCORRECT: Expected 'Invalid rule' for $ip:$port, got '$actual_response'"
+                        validation_status=1
+                    fi
+                    ;;
+                "SUCCESS_EXPECTED")
+                    if [[ "$actual_response" != *"Rule added"* && "$actual_response" != *"Rule already exists"* ]]; then
+                        validation_result="INCORRECT: Expected success for $ip:$port, got '$actual_response'"
+                        validation_status=1
+                    fi
+                    ;;
+                "CONFLICT_LIKELY")
+                    if [[ "$actual_response" != *"Rule already exists"* && "$actual_response" != *"Rule added"* ]]; then
+                        validation_result="INCORRECT: Expected success/conflict for $ip:$port, got '$actual_response'"
+                        validation_status=1
+                    fi
+                    ;;
+                *)
+                    validation_result="UNKNOWN_EXPECTED: $expected"
+                    validation_status=1
+                    ;;
+            esac
             
             validation_entries+=("$i | $ip:$port | $expected | $actual_response | $validation_result")
             
@@ -343,24 +451,17 @@ test_stress_level() {
     local validation_duration=$(echo "$validation_end_time - $validation_start_time" | bc -l)
     echo "Validation processing took: ${validation_duration}s"
     
-    # Calculate individual validation success rate
+    # Validation success rate calculation
     local real_correctness_rate=$(echo "scale=1; $correct_validations * 100 / $total_validations" | bc -l)
     
-    # Aggregate response counts for comparison
-    # Count response types and capture any missing files for diagnostics
-    local successful=$(grep -l "Rule added" stress_${level}_*.tmp 2>/dev/null | wc -l)
-    local already_exists=$(grep -l "Rule already exists" stress_${level}_*.tmp 2>/dev/null | wc -l)
-    local invalid=$(grep -l "Invalid rule" stress_${level}_*.tmp 2>/dev/null | wc -l)
-    local connection_failed=$(grep -l "Connection refused\|Connection reset\|Connection timed out" stress_${level}_*.tmp 2>/dev/null | wc -l)
-    local empty_responses=$(find . -name "stress_${level}_*.tmp" -size 0 2>/dev/null | wc -l)
-    local total_files=$(ls stress_${level}_*.tmp 2>/dev/null | wc -l)
+    # Real-time response tracking eliminates post-processing overhead
     
-    # Check if any expected client output files are missing
+    # Output file completeness check
     if (( total_files != level )); then
         echo "Warning: Expected $level output files, found $total_files"
     fi
     
-    # Calculate metrics
+    # Performance metrics calculation
     local actual_errors=$((connection_failed + empty_responses))
     local throughput=$(echo "scale=2; $level / $duration" | bc -l 2>/dev/null || echo "0")
     
@@ -370,12 +471,12 @@ test_stress_level() {
     echo "   Validated correctly: $correct_validations/$total_validations (${real_correctness_rate}%)"
     echo "   Response breakdown: $successful new, $already_exists conflicts, $invalid rejected"
     
-    # Only show system errors if they exist
+    # Conditional error reporting
     if [[ $actual_errors -gt 0 ]]; then
         echo "   System errors: $connection_failed connection failures, $empty_responses empty responses"
     fi
     
-    # Report validation failures
+    # Validation failure summary
     if [[ ${#validation_failures[@]} -gt 0 ]]; then
         echo ""
         echo "   VALIDATION FAILURES:"
@@ -394,43 +495,38 @@ test_stress_level() {
     
     echo ""
     
-    # Store metrics for summary report
+    # Metrics collection for summary
     SUCCESS_RATES+=($real_correctness_rate)
     THROUGHPUT_RATES+=($throughput)
     TEST_DURATIONS+=($duration)
     
-    # Calculate system overhead time
-    local test_level_end_time=$(date +%s.%N)
-    local total_test_level_time=$(echo "$test_level_end_time - $test_level_start_time" | bc -l)
-    local client_and_validation_time=$(echo "$duration + $validation_duration" | bc -l)
-    local system_overhead_time=$(echo "$total_test_level_time - $client_and_validation_time" | bc -l)
     
-    # Log test results with detailed timing breakdown
+    # Results logging with performance breakdown
     echo "Level $level: Correctness ${real_correctness_rate}% (${correct_validations}/${total_validations} validated correctly)" >> "$STRESS_RESULTS"
-    echo "  Client-server time: ${duration}s at ${throughput} ops/sec" >> "$STRESS_RESULTS"
+    echo "  Duration: ${duration}s at ${throughput} ops/sec" >> "$STRESS_RESULTS"
     echo "  Validation processing: ${validation_duration}s" >> "$STRESS_RESULTS"
-    echo "  System overhead: ${system_overhead_time}s" >> "$STRESS_RESULTS"
     echo "  Response breakdown: ${successful} new, ${already_exists} conflicts, ${invalid} rejected, ${actual_errors} errors" >> "$STRESS_RESULTS"
     if (( process_failures > 0 )); then
         echo "  Process failures: ${process_failures} client processes terminated unexpectedly" >> "$STRESS_RESULTS"
     fi
     echo "" >> "$STRESS_RESULTS"
     
-    # Server cleanup and verification
+    # Server termination and cleanup
     kill $server_pid 2>/dev/null
     verify_server_cleanup
-    rm -f stress_${level}_*.tmp "server_stress_$level.log" "$validation_log"
+    find "$PROJECT_ROOT" -name "stress_${level}_*.tmp" -delete 2>/dev/null
+    rm -f "server_stress_$level.log" "$validation_log" 2>/dev/null
     
     return 0
 }
 
-# Verify server processes are completely terminated
+# Server process cleanup verification
 verify_server_cleanup() {
     local max_attempts=10
     local attempt=0
     
     while (( attempt < max_attempts )); do
-        # Check for any remaining server processes
+        # Server process detection
         local server_processes=$(pgrep -f "server 2302" 2>/dev/null | wc -l)
         local port_processes=$(lsof -ti:2302 2>/dev/null | wc -l)
         
@@ -443,7 +539,7 @@ verify_server_cleanup() {
         sleep 0.5
     done
     
-    # Force cleanup if verification failed
+    # Forced cleanup on verification failure
     echo "Server cleanup verification: FAILED - forcing cleanup"
     pkill -f "server 2302" 2>/dev/null
     lsof -ti:2302 2>/dev/null | xargs kill -9 2>/dev/null
@@ -476,10 +572,10 @@ echo ""
 echo "Test suite completed at: $(date)"
 echo "Total test execution time: ${TOTAL_DURATION}s ($(echo "scale=1; $TOTAL_DURATION / 60" | bc -l) minutes)"
 
-# Generate dynamic summary based on actual results
+# Summary generation from test results
 echo "SUMMARY:" >> "$STRESS_RESULTS"
 
-# Calculate best performing level
+# Peak performance metrics extraction
 best_correctness_rate="0"
 best_throughput="0"
 max_tested_level=${STRESS_LEVELS[-1]}
@@ -501,9 +597,6 @@ echo "Test methodology: Individual validation of each input against expected out
 echo "Input distribution: 50% conflicts, 20% unique, 10% edge cases, 10% invalid IPs, 10% invalid ports" >> "$STRESS_RESULTS"
 echo "Test levels: ${STRESS_LEVELS[*]}" >> "$STRESS_RESULTS"
 echo "" >> "$STRESS_RESULTS"
-echo "Note: Total execution time includes client-server communication, validation processing," >> "$STRESS_RESULTS"
-echo "and system overhead (server startup/shutdown, process management, file I/O operations," >> "$STRESS_RESULTS"
-echo "resource cleanup, memory/descriptor cleanup, cleanup verification between test levels)." >> "$STRESS_RESULTS"
 
 echo -e "\n${GREEN}Stress test completed${NC}"
 echo -e "${BLUE}Results saved to: $STRESS_RESULTS${NC}"

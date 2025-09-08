@@ -1,0 +1,17 @@
+Stress Test Results - Maximum Concurrency
+=========================================
+Timestamp: Mon Sep  8 22:38:14 BST 2025
+
+Level 100000: Correctness 100.0% (100000/100000 validated correctly)
+  Duration: 876.215126839s at 114.12 ops/sec
+  Validation processing: 397.364735810s
+  Response breakdown: 20007 new, 59993 conflicts, 20000 rejected, 0 errors
+
+SUMMARY:
+Maximum tested concurrency: 100000 concurrent connections
+Server correctness rate: 100.0% (individual input-output validation)
+Peak throughput: 114.12 ops/sec
+Total test execution time: 1274.018597003s (21.2 minutes)
+Test methodology: Individual validation of each input against expected outcome
+Input distribution: 50% conflicts, 20% unique, 10% edge cases, 10% invalid IPs, 10% invalid ports
+Test levels: 100000
