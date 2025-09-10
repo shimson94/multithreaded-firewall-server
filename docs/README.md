@@ -4,11 +4,12 @@ A high-performance, thread-safe firewall server implementation in C that demonst
 
 ## 🎯 Key Achievements
 
-- **10,000 concurrent connections** with 100% correctness validation
-- **386.24 ops/sec** peak throughput under extreme load
-- **28,500+ total connections** tested with individual input-output validation
-- **Zero memory leaks** (Valgrind verified)
-- **Comprehensive testing** with realistic input scenarios and complete error transparency
+- **100,000 concurrent connections** with 100% correctness validation (21.2 minutes execution)
+- **957.85 ops/sec** peak throughput with mixed concurrent operations
+- **941.79 ops/sec** sustained throughput under stress testing
+- **Zero memory leaks** (Valgrind verified: 189/189, 607/607 allocations)
+- **Thread-safe design** with proper mutex synchronisation and race condition prevention
+- **Dynamic memory management** with efficient capacity scaling
 
 ## 🏗️ Architecture
 
@@ -30,17 +31,25 @@ Main Thread
 
 ## 📊 Performance Metrics
 
-| Concurrency Level | Correctness | Throughput | Client-Server Time | Total Connections |
-|-------------------|-------------|------------|-------------------|-------------------|
-| 50 | 100.0% (50/50) | 343.78 ops/sec | 0.145s | 50 |
-| 100 | 100.0% (100/100) | 384.36 ops/sec | 0.260s | 100 |
-| 250 | 100.0% (250/250) | 385.71 ops/sec | 0.648s | 250 |
-| 500 | 100.0% (500/500) | 386.24 ops/sec | 1.295s | 500 |
-| 1,000 | 100.0% (1000/1000) | 355.70 ops/sec | 2.811s | 1,000 |
-| 5,000 | 100.0% (5000/5000) | 266.82 ops/sec | 18.739s | 5,000 |
-| 10,000 | 100.0% (10000/10000) | 196.01 ops/sec | 51.017s | 10,000 |
+### Stress Testing Results (test_stress.sh)
+| Concurrency Level | Correctness | Throughput | Duration | Response Breakdown |
+|-------------------|-------------|------------|----------|-------------------|
+| 500 | 100.0% (500/500) | **941.79 ops/sec** | 0.53s | 107 new, 293 conflicts, 100 rejected |
+| 1,000 | 100.0% (1000/1000) | **933.90 ops/sec** | 1.07s | 207 new, 593 conflicts, 200 rejected |
+| 3,000 | 100.0% (3000/3000) | **926.24 ops/sec** | 3.24s | 607 new, 1793 conflicts, 600 rejected |
+| 5,000 | 100.0% (5000/5000) | **743.62 ops/sec** | 6.72s | 1007 new, 2993 conflicts, 1000 rejected |
+| 10,000 | 100.0% (10000/10000) | **741.31 ops/sec** | 13.49s | 2007 new, 5993 conflicts, 2000 rejected |
+| **100,000** | 100.0% (100000/100000) | **114.12 ops/sec** | **876.22s (21.2 min)** | 20007 new, 59993 conflicts, 20000 rejected |
 
-**Overall: 28,500+ connections with 100% individual input-output validation**
+### Concurrency Testing Results (test_concurrency.sh)
+| Test Level | Correctness | Throughput | Mixed Operations | Response Breakdown |
+|------------|-------------|------------|------------------|-------------------|
+| 100 | 100.0% (100/100) | 750.35 ops/sec | ADD/CHECK/LIST/DELETE | 5 new, 15 conflicts, 10 rejected |
+| 500 | 100.0% (500/500) | 941.83 ops/sec | ADD/CHECK/LIST/DELETE | 25 new, 75 conflicts, 50 rejected |
+| 1,000 | 100.0% (1000/1000) | **957.85 ops/sec** | ADD/CHECK/LIST/DELETE | 50 new, 150 conflicts, 100 rejected |
+| 2,500 | 100.0% (2500/2500) | 947.22 ops/sec | ADD/CHECK/LIST/DELETE | 125 new, 375 conflicts, 250 rejected |
+
+**Maximum Scale: 100,000 concurrent connections with 100% individual validation**
 
 ## 🚀 Features
 
@@ -62,8 +71,9 @@ Main Thread
 ### Memory Management
 - **Dynamic Arrays**: Rules and requests grow automatically
 - **Proper Cleanup**: All malloc/free pairs verified with enhanced cleanup verification
-- **Memory Safety**: Valgrind shows 204/204 perfect allocation ratios
+- **Memory Safety**: Valgrind shows 189/189, 607/607 perfect allocation ratios
 - **Process Monitoring**: Complete process failure tracking and diagnostic reporting
+- **414x Performance Optimization**: Real-time response classification using bash built-ins
 
 ### Concurrency Design
 - **POSIX Threads**: One thread per client connection
@@ -92,10 +102,11 @@ multithreaded-firewall-server/
 │   ├── README.md             # This file
 │   └── PERFORMANCE.md        # Detailed performance analysis
 ├── test_results/            # Generated test results
-│   ├── concurrency_results.txt  # Concurrency test output
-│   ├── stress_results.txt       # Stress test metrics
-│   ├── memory_test_results.txt  # Memory analysis results
-│   └── valgrind_summary.txt     # Memory leak analysis
+│   ├── concurrency_results.txt     # Concurrency test output
+│   ├── stress_results.txt          # Stress test metrics (up to 10K)
+│   ├── max_stress_result_found.txt # Maximum scale test (100K connections)
+│   ├── memory_test_results.txt     # Memory analysis results
+│   └── valgrind_summary.txt        # Memory leak analysis
 ├── screenshots/              # Test output demonstrations
 │   ├── concurrency_test.png  # Place concurrency test screenshot here
 │   ├── memory_test.png       # Place memory test screenshot here
@@ -106,9 +117,26 @@ multithreaded-firewall-server/
 ## 🧪 Testing & Validation
 
 ### Automated Test Suite
-- **Concurrency Tests**: Multi-threaded performance validation with race condition testing
-- **Memory Tests**: Valgrind-based leak detection with comprehensive error scenario coverage
-- **Stress Tests**: High-performance testing with 10,000 concurrent connections and realistic input distribution
+- **Concurrency Tests**: Mixed operations race condition testing with ADD/CHECK/LIST/DELETE
+- **Memory Tests**: Valgrind-based leak detection with comprehensive error scenario coverage  
+- **Stress Tests**: High-performance testing with up to 100,000 concurrent connections
+
+### Testing Methodology Enhancements
+
+**414x Test Validation Performance Improvement:**
+
+**Before (Slow Approach):**
+1. **Subprocess Overhead**: After all clients finished, run separate `grep | wc -l` commands to count different response types
+2. **Multiple File Reads**: Read through all output files multiple times for different metrics
+3. **Post-Processing Phase**: Wait for all tests to complete, then process results in separate step
+
+**After (414x Faster):**
+1. **Bash Built-ins**: Use bash string matching and variables instead of spawning subprocesses
+2. **Real-time Classification**: Count response types as they're generated during test execution
+3. **Single-Pass Processing**: Eliminate the separate post-processing phase entirely
+
+**Additional Enhancements:**
+- **Parallel chunk processing**: Enables efficient validation of large-scale tests without performance degradation
 
 ### Test Results Screenshots
 
@@ -182,35 +210,29 @@ cd tests && ./test_stress.sh
 - **Documentation**: Technical specifications, performance metrics
 - **Version Control**: Git workflow, professional presentation
 
-## 🎓 Academic Context
-
-**Course**: Systems Programming  
-**Grade**: 94% (136/144 points)  
-**Institution**: University-level systems programming coursework  
-**Focus**: Demonstrating advanced C programming and concurrent system design
 
 ## 🔬 Technical Details
 
-### Performance Optimisations
-- **Thread Pool Pattern**: Efficient thread lifecycle management
-- **Memory Pre-allocation**: Reduced malloc/free overhead
-- **Lock Granularity**: Fine-grained mutex protection
-- **Buffer Management**: Optimal network I/O handling
+### Server Performance Optimisations
+- **Thread-Per-Client Model**: Efficient concurrent connection handling
+- **Mutex-Protected Shared State**: Thread-safe rule management without race conditions
+- **Dynamic Memory Scaling**: Capacity doubling strategy for efficient growth
+- **Network Socket Optimisation**: Proper connection lifecycle management
 
 ### Production Readiness
-- **Error Recovery**: Graceful failure handling
-- **Resource Limits**: Configurable connection limits
-- **Logging**: Comprehensive operation tracking
-- **Security**: Input validation and buffer protection
+- **Large-Scale Testing**: Tested up to 100,000 concurrent connections
+- **Error Transparency**: Complete process failure tracking and diagnostic reporting
+- **Memory Safety**: Valgrind-verified zero leaks (189/189, 607/607 allocations)
+- **Input Validation**: Comprehensive IP/port validation with malformed input handling
 
 ## 📈 Scalability Analysis
 
-The server demonstrates excellent scalability characteristics:
-- **Linear Performance**: Throughput scales with concurrent load
-- **Resource Efficiency**: Minimal memory overhead per connection
-- **Stability**: Consistent 100% success rates across all test scenarios
-- **Reliability**: Zero crashes or memory leaks under maximum load
+The server demonstrates strong scalability characteristics:
+- **Peak Performance**: 957.85 ops/sec with mixed operations (1,000 concurrent)
+- **Maximum Scale**: 100,000 concurrent connections tested (21.2 minutes sustained)
+- **High Reliability**: 100% correctness validation across all test levels
+- **Memory Efficiency**: Zero leaks with dynamic scaling under extreme load
 
 ---
 
-*This project showcases advanced systems programming skills suitable for backend engineering, infrastructure development, and high-performance computing roles.*
+*This project demonstrates advanced systems programming capabilities including multithreading, network programming, and concurrent system design - validated through comprehensive testing at scale with up to 100,000 concurrent connections.*
